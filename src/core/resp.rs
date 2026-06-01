@@ -1,4 +1,4 @@
-use std::fmt;
+
 
 #[derive(Debug, PartialEq)]
 pub enum RespType {
@@ -108,4 +108,32 @@ pub fn decode(data: &[u8]) -> Result<RespType, String> {
     }
     let (value, _) = decode_one(data)?;
     Ok(value)
+}
+impl RespType {
+
+    pub fn to_string_vec(&self) -> Result<Vec<String>, String> {
+        match self {
+            RespType::Array(arr) => {
+                let mut strings = Vec::new();
+                for item in arr {
+                    if let RespType::BulkString(s) = item {
+                        strings.push(s.clone());
+                    } else {
+                        return Err("Expected array of bulk strings".to_string());
+                    }
+                }
+                Ok(strings)
+            }
+            _ => Err("Expected RESP array".to_string()),
+        }
+    }
+
+
+    pub fn encode_string(value: &str, is_simple: bool) -> Vec<u8> {
+        if is_simple {
+            format!("+{}\r\n", value).into_bytes()
+        } else {
+            format!("${}\r\n{}\r\n", value.len(), value).into_bytes()
+        }
+    }
 }

@@ -1,7 +1,9 @@
 use crate::config::Config;
+use crate::core::cmd::YonkoCmd;
+use crate::core::eval::eval_and_respond;
+use crate::core::resp::decode;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-
 pub fn run_sync_tcp_server(config: &Config) {
     let address = format!("{}:{}", config.host, config.port);
     println!("starting a synchronous TCP server on {}", address);
@@ -26,34 +28,53 @@ pub fn run_sync_tcp_server(config: &Config) {
         }
     }
 }
-fn handle_client(stream: &mut TcpStream, con_clients: &mut i32, peer_addr: SocketAddr) {
+fn read_command(c: &mut TcpStream) -> Result<YonkoCmd, String> {
     let mut buf = [0; 512];
+    let n = c.read(&mut buf).map_err(|e| e.to_string())?;
 
+    if n == 0 {
+        return Err("EOF".to_string());
+    }
+
+    let resp = decode(&buf[..n])?;
+
+    let tokens = resp.to_string_vec()?;
+
+    if tokens.is_empty() {
+        return Err("Empty command".to_string());
+    }
+
+    Ok(YonkoCmd {
+        cmd: tokens[0].to_uppercase(),
+        args: tokens[1..].to_vec(),
+    })
+}
+
+fn handle_client(stream: &mut TcpStream, con_clients: &mut i32, peer_addr: SocketAddr) {
     loop {
-        match stream.read(&mut buf) {
-            Ok(0) => {
-                *con_clients -= 1;
-                println!(
-                    "client dissconnected {}, concurrent clients {}",
-                    peer_addr, con_clients
-                );
-                break;
-            }
-            Ok(n) => {
-                let cmd = String::from_utf8_lossy(&buf[..n]);
-                println!("command: {}", cmd.trim_end());
-
-                if let Err(e) = stream.write_all(&buf[..n]) {
-                    eprintln!("err write: {}", e);
-                    break;
+        match read_command(stream) {
+            Ok(cmd) => {
+                if let Err(e) = eval_and_respond(&cmd, stream) {
+                    let err_msg = format!("-ERR {}\r\n", e);
+                    let _ = stream.write_all(err_msg.as_bytes());
                 }
             }
             Err(e) => {
                 *con_clients -= 1;
-                eprintln!(
-                    "client dissconnected with error: {}, concurrent clients {}",
-                    e, con_clients
-                );
+
+                if e == "EOF" {
+                    println!(
+                        "client disconnected {}, concurrent clients {}",
+                        peer_addr, con_clients
+                    );
+                } else {
+                    eprintln!(
+                        "client disconnected with error: {}, concurrent clients {}",
+                        e, con_clients
+                    );
+                    let err_msg = format!("-ERR {}\r\n", e);
+                    let _ = stream.write_all(err_msg.as_bytes());
+                }
                 break;
             }
         }

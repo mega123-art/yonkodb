@@ -1,4 +1,5 @@
 mod config;
+mod core;
 mod server;
 use clap::Parser;
 use config::Config;
