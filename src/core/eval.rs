@@ -4,8 +4,6 @@ use std::io::Write;
 use std::net::TcpStream;
 
 pub fn eval_and_respond(cmd: &YonkoCmd, stream: &mut TcpStream) -> Result<(), String> {
-    println!("command: {}", cmd.cmd);
-
     match cmd.cmd.as_str() {
         "PING" => eval_ping(&cmd.args, stream),
         _ => {
@@ -21,11 +19,10 @@ fn eval_ping(args: &[String], stream: &mut TcpStream) -> Result<(), String> {
         return Err("ERR wrong number of arguments for 'ping' command".to_string());
     }
 
-    let response = if args.is_empty() {
-        RespType::encode_string("PONG", true)
+    if args.is_empty() {
+        stream.write_all(b"+PONG\r\n").map_err(|e| e.to_string())
     } else {
-        RespType::encode_string(&args[0], false)
-    };
-
-    stream.write_all(&response).map_err(|e| e.to_string())
+        let response = RespType::encode_string(&args[0], false);
+        stream.write_all(&response).map_err(|e| e.to_string())
+    }
 }

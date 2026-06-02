@@ -45,7 +45,7 @@ fn read_command(c: &mut TcpStream) -> Result<YonkoCmd, String> {
     }
 
     Ok(YonkoCmd {
-        cmd: tokens[0].to_uppercase(),
+        cmd: tokens[0].to_ascii_uppercase(),
         args: tokens[1..].to_vec(),
     })
 }

@@ -33,7 +33,9 @@ fn read_simple_string(data: &[u8]) -> RespResult {
         pos += 1;
     }
 
-    let s = String::from_utf8_lossy(&data[1..pos]).to_string();
+    let s = std::str::from_utf8(&data[1..pos])
+        .map_err(|e| e.to_string())?
+        .to_string();
     Ok((RespType::SimpleString(s), pos + 2)) // +2 for \r\n
 }
 
@@ -44,7 +46,9 @@ fn read_error(data: &[u8]) -> RespResult {
         pos += 1;
     }
 
-    let s = String::from_utf8_lossy(&data[1..pos]).to_string();
+    let s = std::str::from_utf8(&data[1..pos])
+        .map_err(|e| e.to_string())?
+        .to_string();
     Ok((RespType::Error(s), pos + 2))
 }
 
@@ -66,7 +70,9 @@ fn read_bulk_string(data: &[u8]) -> RespResult {
     let (len, delta) = read_length(&data[1..]);
     let pos = 1 + delta;
 
-    let s = String::from_utf8_lossy(&data[pos..pos + len]).to_string();
+    let s = std::str::from_utf8(&data[pos..pos + len])
+        .map_err(|e| e.to_string())?
+        .to_string();
     // pos + len + 2 (for the trailing \r\n)
     Ok((RespType::BulkString(s), pos + len + 2))
 }
@@ -131,9 +137,20 @@ impl RespType {
 
     pub fn encode_string(value: &str, is_simple: bool) -> Vec<u8> {
         if is_simple {
-            format!("+{}\r\n", value).into_bytes()
+            let mut res = Vec::with_capacity(1 + value.len() + 2);
+            res.push(b'+');
+            res.extend_from_slice(value.as_bytes());
+            res.extend_from_slice(b"\r\n");
+            res
         } else {
-            format!("${}\r\n{}\r\n", value.len(), value).into_bytes()
+            let len_str = value.len().to_string();
+            let mut res = Vec::with_capacity(1 + len_str.len() + 2 + value.len() + 2);
+            res.push(b'$');
+            res.extend_from_slice(len_str.as_bytes());
+            res.extend_from_slice(b"\r\n");
+            res.extend_from_slice(value.as_bytes());
+            res.extend_from_slice(b"\r\n");
+            res
         }
     }
 }
