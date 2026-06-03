@@ -55,9 +55,15 @@ pub fn run_async_tcp_server(config: &Config) {
                     if let Some(client_stream) = clients.get_mut(&token) {
                         match read_command(client_stream) {
                             Ok(cmd) => {
-                                if let Err(e) = eval_and_respond(&cmd, client_stream) {
-                                    let err_msg = format!("-ERR {}\r\n", e);
-                                    let _ = client_stream.write_all(err_msg.as_bytes());
+                                if cmd.cmd == "PING" && cmd.args.is_empty() {
+                                    if let Err(_) = client_stream.write_all(b"+PONG\r\n") {
+                                        should_disconnect = true;
+                                    }
+                                } else {
+                                    if let Err(e) = eval_and_respond(&cmd, client_stream) {
+                                        let err_msg = format!("-ERR {}\r\n", e);
+                                        let _ = client_stream.write_all(err_msg.as_bytes());
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -88,6 +94,19 @@ fn read_command(c: &mut TcpStream) -> Result<YonkoCmd, String> {
     match c.read(&mut buf) {
         Ok(0) => return Err("EOF".to_string()),
         Ok(n) => {
+            if n == 14 && (&buf[..14] == b"*1\r\n$4\r\nPING\r\n" || &buf[..14] == b"*1\r\n$4\r\nping\r\n") {
+                return Ok(YonkoCmd {
+                    cmd: "PING".to_string(),
+                    args: Vec::new(),
+                });
+            }
+            if n == 6 && (&buf[..6] == b"PING\r\n" || &buf[..6] == b"ping\r\n") {
+                return Ok(YonkoCmd {
+                    cmd: "PING".to_string(),
+                    args: Vec::new(),
+                });
+            }
+
             let resp = decode(&buf[..n])?;
             let tokens = resp.to_string_vec()?;
 
@@ -105,5 +124,4 @@ fn read_command(c: &mut TcpStream) -> Result<YonkoCmd, String> {
         }
         Err(e) => return Err(e.to_string()),
     }
-
 }
