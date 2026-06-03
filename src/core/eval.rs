@@ -1,20 +1,17 @@
 use crate::core::cmd::YonkoCmd;
 use crate::core::resp::RespType;
 use std::io::Write;
-use std::net::TcpStream;
 
-pub fn eval_and_respond(cmd: &YonkoCmd, stream: &mut TcpStream) -> Result<(), String> {
+pub fn eval_and_respond(cmd: &YonkoCmd, stream: &mut impl Write) -> Result<(), String> {
     match cmd.cmd.as_str() {
         "PING" => eval_ping(&cmd.args, stream),
         _ => {
-            // Default to PING for now if unknown
             eval_ping(&cmd.args, stream)
         }
     }
 }
 
-//ping
-fn eval_ping(args: &[String], stream: &mut TcpStream) -> Result<(), String> {
+fn eval_ping(args: &[String], stream: &mut impl Write) -> Result<(), String> {
     if args.len() >= 2 {
         return Err("ERR wrong number of arguments for 'ping' command".to_string());
     }

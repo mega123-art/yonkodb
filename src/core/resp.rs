@@ -1,5 +1,3 @@
-
-
 #[derive(Debug, PartialEq)]
 pub enum RespType {
     SimpleString(String),
@@ -81,7 +79,7 @@ fn read_array(data: &[u8]) -> RespResult {
     // First byte is '*'
     let (count, delta) = read_length(&data[1..]);
     let mut pos = 1 + delta;
-    
+
     let mut elems = Vec::with_capacity(count);
 
     for _ in 0..count {
@@ -116,7 +114,6 @@ pub fn decode(data: &[u8]) -> Result<RespType, String> {
     Ok(value)
 }
 impl RespType {
-
     pub fn to_string_vec(&self) -> Result<Vec<String>, String> {
         match self {
             RespType::Array(arr) => {
@@ -133,7 +130,6 @@ impl RespType {
             _ => Err("Expected RESP array".to_string()),
         }
     }
-
 
     pub fn encode_string(value: &str, is_simple: bool) -> Vec<u8> {
         if is_simple {
